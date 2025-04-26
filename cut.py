@@ -1,13 +1,49 @@
 import sys
 import argparse
 
+def parse_field_string(field_string):
+    fields = set()
+    try:
+        if ',' in field_string:
+            separator = ','
+        else:
+            separator = None
+        
+        parts = field_string.split(separator)
+        
+        if not parts or all(p.strip() == "" for p in parts):
+            raise ValueError("Field specification cannot be empty.")
+        
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            num = int(part)
+
+            if num <= 0:
+                raise ValueError("Field numbers must be positive.")
+            
+            fields.add(num)
+        
+        if not fields:
+            raise ValueError("No valid field numbers found in specification.")
+
+        sorted_fields = sorted(list(fields))
+        return sorted_fields
+
+    except ValueError as e:
+            # Raise ArgumentTypeError for argparse to handle nicely
+            raise argparse.ArgumentTypeError(f"Invalid field specification '{field_string}': {e}")
+
+
+
 parser = argparse.ArgumentParser(
     description= "Cut out selected portions from each line of a file.",
     epilog="Example: python %(prog)s -f 2 -d ',' data.csv" 
 )
 
 parser.add_argument('-f', '--field', 
-    type=int, 
+    type=parse_field_string, 
     required=True, 
     help='Select only this field (positive integer)'
 )
@@ -27,12 +63,12 @@ parser.add_argument(
 
 try:
     args = parser.parse_args()
-    if(args.field<=0):
-        parser.error("argument -f/--field: must be a positive integer")
+    
 
-    field_number = args.field
+    field_numbers = args.field
     delimeter = args.delimiter
     filename = args.filename
+    output_delimiter = delimeter
 
     input_source = None
     if(filename):
@@ -52,16 +88,16 @@ try:
     with input_source:
         for line in input_source:
             processed_line = line.rstrip('\r\n')
-            fields = processed_line.split(delimeter)
+            line_fields = processed_line.split(delimeter)
+            output_parts = [] # Store the parts to print for this line
 
-            try:
-                if field_number -1 < len(fields):
-                     print(fields[field_number - 1])
-                else:
-                     print() # Or print("", file=sys.stderr) to indicate missing field
+            for field_num in field_numbers:
+                index = field_num - 1
 
-            except IndexError:
-                 print() # Print empty line for lines that don't have the field
+                if 0 <= index < len(line_fields):
+                    output_parts.append(line_fields[index])
+            
+            print(output_delimiter.join(output_parts))
 
 # --- Handle Argument Parsing Errors ---
 except argparse.ArgumentError as e:
